@@ -1,0 +1,11 @@
+#pragma kernel CSMain
+
+RWTexture2D<float4> Result;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint pid : SV_GroupIndex, uint3 gtid : SV_GroupThreadID)
+{
+    // float index = (gid.x +  gid.y) % 2;
+    // Result[id.xy] = float4(index, index, index, 1);
+    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+}
