@@ -15,9 +15,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     if (uv.x >= _Width || uv.y >= _Height)
         return;
     float4 c1 = _InputTexture[uv * 2 + int2(0,0)];
-    float4 c2 = uv.x * 2 + 1 < _Width ? _InputTexture[uv * 2 + int2(1,0)] : c1;
-    float4 c3 = uv.y * 2 + 1 < _Height? _InputTexture[uv * 2 + int2(0,1)] : c1;
-    float4 c4 = (uv.x * 2 + 1 < _Width && uv.y * 2 + 1 < _Height) ? _InputTexture[uv * 2 + int2(1,1)] : c1;
+    float4 c2 = uv.x * 2 + 1 < _Width ? _InputTexture[uv * 2 + int2(1,0)] : 0;
+    float4 c3 = uv.y * 2 + 1 < _Height? _InputTexture[uv * 2 + int2(0,1)] : 0;
+    float4 c4 = (uv.x * 2 + 1 < _Width && uv.y * 2 + 1 < _Height) ? _InputTexture[uv * 2 + int2(1,1)] : 0;
     c1 = float4(pow(abs(c1.rgb), 1.0 / 2.2), 1.0);
     c2 = float4(pow(abs(c2.rgb), 1.0 / 2.2), 1.0);
     c3 = float4(pow(abs(c3.rgb), 1.0 / 2.2), 1.0);
