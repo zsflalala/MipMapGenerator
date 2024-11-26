@@ -12,42 +12,42 @@ public class MipmapRenderPass : ScriptableRenderPass
     private static readonly int Height   = Shader.PropertyToID("_Height");
     private static readonly int Width    = Shader.PropertyToID("_Width");
     private static readonly int InputTexture  = Shader.PropertyToID("_InputTexture");
-    private int                 OutputTexture = Shader.PropertyToID("_OutputTexture");
+    private readonly int        _outputTexture = Shader.PropertyToID("_OutputTexture");
     
-    private readonly MipmapGeneratorFeature.Settings m_Settings;
-    private readonly ComputeShader                   m_MipmapComputeShader;
-    private RenderTexture                            m_MipmapTexture;
-    private RenderTexture                            m_LastTexture = null;
-    private int                                      m_ComputeKernel;
-    private RenderTexture[]                          m_MipmapTextures;
-    private StreamWriter                             m_Writer = null;  
-    private bool                                     isMipmapGenerated = false; 
+    private readonly MipmapGeneratorFeature.Settings _mSettings;
+    private readonly ComputeShader                   _mMipmapComputeShader;
+    private RenderTexture                            _mMipmapTexture;
+    private RenderTexture                            _mLastTexture = null;
+    private int                                      _mComputeKernel;
+    private RenderTexture[]                          _mMipmapTextures;
+    private StreamWriter                             _mWriter = null;  
+    private bool                                     _isMipmapGenerated = false; 
 
     public MipmapRenderPass(MipmapGeneratorFeature.Settings settings)
     {
-        this.m_Settings = settings;
-        m_MipmapComputeShader = Resources.Load<ComputeShader>("MipmapComputeShader");
+        this._mSettings = settings;
+        _mMipmapComputeShader = Resources.Load<ComputeShader>("MipmapComputeShader");
     }
     
     public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData) 
     {
-        if (!isMipmapGenerated || m_LastTexture != m_MipmapTexture)
+        if (!_isMipmapGenerated || _mLastTexture != _mMipmapTexture)
         {
-            if (m_Settings.inputTexture == null)
+            if (_mSettings.inputTexture == null)
             {
                 Debug.LogError("Input Texture is missing. Please assign a texture in the Inspector.");
                 return;
             }
 
-            if (m_MipmapComputeShader == null)
+            if (_mMipmapComputeShader == null)
             {
                 Debug.LogError("Compute Shader is missing or not found in the Resources folder.");
                 return;
             }
             
             GenerateMipmaps();
-            isMipmapGenerated = true;
-            m_LastTexture = m_MipmapTexture;
+            _isMipmapGenerated = true;
+            _mLastTexture = _mMipmapTexture;
         }
     }
 
@@ -55,81 +55,65 @@ public class MipmapRenderPass : ScriptableRenderPass
     {
         
     }
-    
-    public override void OnCameraCleanup(CommandBuffer cmd) 
-    {
-        // if (m_MipmapTextures != null)
-        // {
-        //     foreach (var texture in m_MipmapTextures)
-        //     {
-        //         if (texture != null)
-        //         {
-        //             texture.Release();  // 释放RenderTexture资源
-        //         }
-        //     }
-        // }
-    }
 
     private void GenerateMipmaps()
     {
-        m_ComputeKernel = m_MipmapComputeShader.FindKernel("CSMain");
-        m_MipmapComputeShader.SetInt(Strategy, (int)m_Settings.strategy);
+        _mComputeKernel = _mMipmapComputeShader.FindKernel("CSMain");
+        _mMipmapComputeShader.SetInt(Strategy, (int)_mSettings.strategy);
         
-        int levels = m_Settings.mipmapLevels > 0 ? m_Settings.mipmapLevels : Mathf.FloorToInt(Mathf.Log(Mathf.Max(m_Settings.inputTexture.width, m_Settings.inputTexture.height), 2)) + 1;
-        m_MipmapTextures = new RenderTexture[levels];
+        int levels = _mSettings.mipmapLevels > 0 ? _mSettings.mipmapLevels : Mathf.FloorToInt(Mathf.Log(Mathf.Max(_mSettings.inputTexture.width, _mSettings.inputTexture.height), 2)) + 1;
+        _mMipmapTextures = new RenderTexture[levels];
         Stopwatch stopwatch = new Stopwatch();
-        string filePath = $"{Application.dataPath}/{m_Settings.outputDirectory}/MipmapGenerationTimesAndPixels.txt";
+        string filePath = $"{Application.dataPath}/{_mSettings.outputDirectory}/MipmapGenerationTimesAndPixels.txt";
         string directoryPath = Path.GetDirectoryName(filePath);
         if (!Directory.Exists(directoryPath))
         {
-            Directory.CreateDirectory(directoryPath);
+            if (directoryPath != null) Directory.CreateDirectory(directoryPath);
         }
         if (!File.Exists(filePath))
         {
             File.Create(filePath).Dispose(); // 创建文件并立即关闭文件流
         }
         
-        using (m_Writer = new StreamWriter(filePath, true)) // 'true' 表示追加到文件
+        using (_mWriter = new StreamWriter(filePath, true)) // 'true' 表示追加到文件
         {
             for (int i = 0; i < levels; i++)
             {
-                stopwatch.Start();
-            
-                int width  = Mathf.Max(1, m_Settings.inputTexture.width  >> i);
-                int height = Mathf.Max(1, m_Settings.inputTexture.height >> i);
+                int width  = Mathf.Max(1, _mSettings.inputTexture.width  >> i);
+                int height = Mathf.Max(1, _mSettings.inputTexture.height >> i);
                 
-                m_MipmapTextures[i] = new RenderTexture(width, height, 0)
+                _mMipmapTextures[i] = new RenderTexture(width, height, 0)
                 {
                     dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
-                    enableRandomWrite = true,
-                    useMipMap = true,
-                    autoGenerateMips = false
+                    enableRandomWrite = true
                 };
-                m_MipmapTextures[i].Create();
-
+                _mMipmapTextures[i].Create();
+                Texture2D mipTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                
+                stopwatch.Start();
                 if (i == 0) 
                 {
-                    Graphics.Blit(m_Settings.inputTexture, m_MipmapTextures[0]);
+                    Graphics.Blit(_mSettings.inputTexture, _mMipmapTextures[0]);
                 }
                 else
                 {
-                    m_MipmapComputeShader.SetInt(MipLevel, i);
-                    m_MipmapComputeShader.SetTexture(m_ComputeKernel, InputTexture, m_MipmapTextures[i-1]);
-                    m_MipmapComputeShader.SetInt(Width, width);
-                    m_MipmapComputeShader.SetInt(Height, height);
-                    m_MipmapComputeShader.SetTexture(m_ComputeKernel, OutputTexture, m_MipmapTextures[i]);
-                    m_MipmapComputeShader.Dispatch(m_ComputeKernel, Mathf.CeilToInt(width / 8.0f), Mathf.CeilToInt(height / 8.0f), 1);
+                    _mMipmapComputeShader.SetInt(MipLevel, i);
+                    _mMipmapComputeShader.SetTexture(_mComputeKernel, InputTexture, _mMipmapTextures[i-1]);
+                    _mMipmapComputeShader.SetInt(Width, width);
+                    _mMipmapComputeShader.SetInt(Height, height);
+                    _mMipmapComputeShader.SetTexture(_mComputeKernel, _outputTexture, _mMipmapTextures[i]);
+                    _mMipmapComputeShader.Dispatch(_mComputeKernel, Mathf.CeilToInt(width / 8.0f), Mathf.CeilToInt(height / 8.0f), 1);
                 }
             
                 stopwatch.Stop();
                 double elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
-                Debug.Log($"{m_Settings.inputTexture.name} level {i} generate mipmap time : {elapsedMilliseconds:F6} ms");
-                m_Writer.WriteLine($"{i} {elapsedMilliseconds:F6} {width*height}");
+                _mWriter.WriteLine($"{i} {elapsedMilliseconds:F6} {width*height}");
                 stopwatch.Reset();
+                Debug.Log($"{_mSettings.inputTexture.name} level {i} generate mipmap time : {elapsedMilliseconds:F6} ms");
             }
         }
         
-        if (m_Settings.saveToCPU)
+        if (_mSettings.saveToCPU)
         {
             SaveMipmapsToCPU(levels);
         }
@@ -137,7 +121,7 @@ public class MipmapRenderPass : ScriptableRenderPass
     
     private void SaveMipmapsToCPU(int levels)
     {
-        string outputDirectory = $"{Application.dataPath}/{m_Settings.outputDirectory}";
+        string outputDirectory = $"{Application.dataPath}/{_mSettings.outputDirectory}";
         if (!Directory.Exists(outputDirectory))
         {
             Directory.CreateDirectory(outputDirectory);
@@ -145,40 +129,36 @@ public class MipmapRenderPass : ScriptableRenderPass
 
         for (int i = 0; i < levels; i++)
         {
-            int width  = m_MipmapTextures[i].width;
-            int height = m_MipmapTextures[i].height;
+            int width  = _mMipmapTextures[i].width;
+            int height = _mMipmapTextures[i].height;
             
-            RenderTexture.active = m_MipmapTextures[i];
-            
+            RenderTexture.active = _mMipmapTextures[i];
             Texture2D mipTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             mipTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
             mipTexture.Apply();
-            
-            string filePath = $"{outputDirectory}/{m_Settings.inputTexture.name}_mipLevel_{i}.png";
+            RenderTexture.active = null;
+            string filePath = $"{outputDirectory}/{_mSettings.inputTexture.name}_mipLevel_{i}.png";
             byte[] pngData = mipTexture.EncodeToPNG();
             File.WriteAllBytes(filePath, pngData);
-
-            Debug.Log($"Saved {m_Settings.inputTexture.name} MipLevel {i} to {filePath}");
             Object.DestroyImmediate(mipTexture);
+            Debug.Log($"Saved {_mSettings.inputTexture.name} MipLevel {i} to {filePath}");
         }
-
-        RenderTexture.active = null;
     }
 
     private void SaveOrigionMipmaps()
     {
-        int maxMipLeve = Mathf.FloorToInt(Mathf.Log(Mathf.Max(m_Settings.inputTexture.width, m_Settings.inputTexture.height), 2)) + 1;
-        RenderTexture renderTexture = new RenderTexture(m_Settings.inputTexture.width, m_Settings.inputTexture.height, 0)
+        int maxMipLeve = Mathf.FloorToInt(Mathf.Log(Mathf.Max(_mSettings.inputTexture.width, _mSettings.inputTexture.height), 2)) + 1;
+        RenderTexture renderTexture = new RenderTexture(_mSettings.inputTexture.width, _mSettings.inputTexture.height, 0)
         {
             dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
             enableRandomWrite = true,
             useMipMap = true,
             autoGenerateMips = true
         };
-        Graphics.Blit(m_Settings.inputTexture, renderTexture);
+        Graphics.Blit(_mSettings.inputTexture, renderTexture);
         RenderTexture.active = renderTexture;
-        Texture2D textureWithMipMap = new Texture2D(m_Settings.inputTexture.width, m_Settings.inputTexture.height, TextureFormat.RGB24, true);
-        textureWithMipMap.ReadPixels(new Rect(0, 0, m_Settings.inputTexture.width, m_Settings.inputTexture.height), 0, 0);
+        Texture2D textureWithMipMap = new Texture2D(_mSettings.inputTexture.width, _mSettings.inputTexture.height, TextureFormat.RGB24, true);
+        textureWithMipMap.ReadPixels(new Rect(0, 0, _mSettings.inputTexture.width, _mSettings.inputTexture.height), 0, 0);
         textureWithMipMap.Apply();
         RenderTexture.active = null;
         renderTexture.Release();
@@ -186,17 +166,17 @@ public class MipmapRenderPass : ScriptableRenderPass
         
         for (int i = 0; i < maxMipLeve; i++)
         {
-            int mipWidth = Mathf.Max(1, m_Settings.inputTexture.width >> i);
-            int mipHeight = Mathf.Max(1, m_Settings.inputTexture.height >> i);
+            int mipWidth = Mathf.Max(1, _mSettings.inputTexture.width >> i);
+            int mipHeight = Mathf.Max(1, _mSettings.inputTexture.height >> i);
 
             Texture2D mipTexture = new Texture2D(mipWidth, mipHeight, TextureFormat.RGBA32, false);
             mipTexture.SetPixels(textureWithMipMap.GetPixels(i));
             mipTexture.Apply();
             
             byte[] bytes = mipTexture.EncodeToPNG();
-            string imgFilePath = $"{Application.dataPath}/OutputMipMap/UnityOrigionMipMaps/{m_Settings.inputTexture.name}_origionLevel_{i}.png";
+            string imgFilePath = $"{Application.dataPath}/OutputMipMap/UnityOrigionMipMaps/{_mSettings.inputTexture.name}_origionLevel_{i}.png";
             File.WriteAllBytes(imgFilePath, bytes);
-            Debug.Log($"{m_Settings.inputTexture.name} Mipmap level {i} saved to: {imgFilePath}");
+            Debug.Log($"{_mSettings.inputTexture.name} Mipmap level {i} saved to: {imgFilePath}");
         }
     }
 }
