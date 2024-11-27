@@ -7,7 +7,6 @@ using Debug = UnityEngine.Debug;
 
 public class MipmapRenderPass : ScriptableRenderPass
 {
-    private static readonly int MipLevel = Shader.PropertyToID("_MipLevel");
     private static readonly int Strategy = Shader.PropertyToID("_Strategy");
     private static readonly int Height   = Shader.PropertyToID("_Height");
     private static readonly int Width    = Shader.PropertyToID("_Width");
@@ -74,6 +73,47 @@ public class MipmapRenderPass : ScriptableRenderPass
         {
             File.Create(filePath).Dispose(); // 创建文件并立即关闭文件流
         }
+
+        Debug.Log(_mSettings.inputTexture.format);
+        Debug.Log(_mSettings.inputTexture.GetPixel(1024,1024));
+        Texture2D testTexture = new Texture2D(_mSettings.inputTexture.width, _mSettings.inputTexture.height, TextureFormat.RGBA32, false);
+        // Color topLeftColor = Color.red;     // 左上角区域是红色
+        // Color topRightColor = Color.green;  // 右上角区域是绿色
+        // Color bottomLeftColor = Color.blue; // 左下角区域是蓝色
+        // Color bottomRightColor = Color.yellow; // 右下角区域是黄色
+        //
+        // for (int y = 0; y < 300; y++)
+        // {
+        //     for (int x = 0; x < 400; x++)
+        //     {
+        //         // 判断当前像素所在的区域
+        //         Color pixelColor;
+        //         if (x < 400 / 2 && y < 300 / 2)
+        //         {
+        //             pixelColor = topLeftColor; // 左上角
+        //         }
+        //         else if (x >= 400 / 2 && y < 300 / 2)
+        //         {
+        //             pixelColor = topRightColor; // 右上角
+        //         }
+        //         else if (x < 400 / 2 && y >= 300 / 2)
+        //         {
+        //             pixelColor = bottomLeftColor; // 左下角
+        //         }
+        //         else
+        //         {
+        //             pixelColor = bottomRightColor; // 右下角
+        //         }
+        //         testTexture.SetPixel(x, y, pixelColor);
+        //     }
+        // }
+        // testTexture.Apply();
+        Color[] pixels = _mSettings.inputTexture.GetPixels();
+        testTexture.SetPixels(pixels);
+        testTexture.Apply();
+        string filePath2 = $"{Application.dataPath}/OutputMipMap/test.png";
+        byte[] pngData = testTexture.EncodeToPNG();
+        File.WriteAllBytes(filePath2, pngData);
         
         using (_mWriter = new StreamWriter(filePath, true)) // 'true' 表示追加到文件
         {
@@ -82,13 +122,11 @@ public class MipmapRenderPass : ScriptableRenderPass
                 int width  = Mathf.Max(1, _mSettings.inputTexture.width  >> i);
                 int height = Mathf.Max(1, _mSettings.inputTexture.height >> i);
                 
-                _mMipmapTextures[i] = new RenderTexture(width, height, 0)
+                _mMipmapTextures[i] = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32)
                 {
-                    dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
                     enableRandomWrite = true
                 };
                 _mMipmapTextures[i].Create();
-                Texture2D mipTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
                 
                 stopwatch.Start();
                 if (i == 0) 
@@ -97,7 +135,6 @@ public class MipmapRenderPass : ScriptableRenderPass
                 }
                 else
                 {
-                    _mMipmapComputeShader.SetInt(MipLevel, i);
                     _mMipmapComputeShader.SetTexture(_mComputeKernel, InputTexture, _mMipmapTextures[i-1]);
                     _mMipmapComputeShader.SetInt(Width, width);
                     _mMipmapComputeShader.SetInt(Height, height);
@@ -116,6 +153,7 @@ public class MipmapRenderPass : ScriptableRenderPass
         if (_mSettings.saveToCPU)
         {
             SaveMipmapsToCPU(levels);
+            // SaveOrigionMipmaps();
         }
     }
     
@@ -148,7 +186,7 @@ public class MipmapRenderPass : ScriptableRenderPass
     private void SaveOrigionMipmaps()
     {
         int maxMipLeve = Mathf.FloorToInt(Mathf.Log(Mathf.Max(_mSettings.inputTexture.width, _mSettings.inputTexture.height), 2)) + 1;
-        RenderTexture renderTexture = new RenderTexture(_mSettings.inputTexture.width, _mSettings.inputTexture.height, 0)
+        RenderTexture renderTexture = new RenderTexture(_mSettings.inputTexture.width, _mSettings.inputTexture.height, 0, RenderTextureFormat.ARGB32)
         {
             dimension = UnityEngine.Rendering.TextureDimension.Tex2D,
             enableRandomWrite = true,
@@ -157,7 +195,7 @@ public class MipmapRenderPass : ScriptableRenderPass
         };
         Graphics.Blit(_mSettings.inputTexture, renderTexture);
         RenderTexture.active = renderTexture;
-        Texture2D textureWithMipMap = new Texture2D(_mSettings.inputTexture.width, _mSettings.inputTexture.height, TextureFormat.RGB24, true);
+        Texture2D textureWithMipMap = new Texture2D(_mSettings.inputTexture.width, _mSettings.inputTexture.height, TextureFormat.RGBA32, true);
         textureWithMipMap.ReadPixels(new Rect(0, 0, _mSettings.inputTexture.width, _mSettings.inputTexture.height), 0, 0);
         textureWithMipMap.Apply();
         RenderTexture.active = null;
@@ -174,7 +212,7 @@ public class MipmapRenderPass : ScriptableRenderPass
             mipTexture.Apply();
             
             byte[] bytes = mipTexture.EncodeToPNG();
-            string imgFilePath = $"{Application.dataPath}/OutputMipMap/UnityOrigionMipMaps/{_mSettings.inputTexture.name}_origionLevel_{i}.png";
+            string imgFilePath = $"{Application.dataPath}/UnityOrigionMipMaps/{_mSettings.inputTexture.name}_origionLevel_{i}.png";
             File.WriteAllBytes(imgFilePath, bytes);
             Debug.Log($"{_mSettings.inputTexture.name} Mipmap level {i} saved to: {imgFilePath}");
         }

@@ -1,45 +1,47 @@
 #pragma kernel CSMain
 
-Texture2D           _InputTexture;
+Texture2D<float4>   _InputTexture;
 RWTexture2D<float4> _OutputTexture;
 
 int _Width;
 int _Height;
-int _MipLevel;
 int _Strategy; // 0: Min, 1: Max, 2: Avg
 
 [numthreads(8, 8, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
-    int2 uv = int2(id.xy);
-    if (uv.x >= _Width || uv.y >= _Height)
+    if (id.x >= _Width || id.y >= _Height)
         return;
-    float4 c1 = _InputTexture[uv * 2 + int2(0,0)];
-    float4 c2 = uv.x * 2 + 1 < _Width ? _InputTexture[uv * 2 + int2(1, 0)] : float4(1.0, 0.0, 0.0, 0);
-    float4 c3 = uv.y * 2 + 1 < _Height? _InputTexture[uv * 2 + int2(0, 1)] : float4(0.0, 1.0, 0.0, 0);
-    float4 c4 = (uv.x * 2 + 1 < _Width && uv.y * 2 + 1 < _Height) ? _InputTexture[uv * 2 + int2(1,1)]: float4(0.0, 0.0, 1.0, 0);
-    c1.rgb = saturate(c1.rgb); // 将 RGB 部分归一化
+    
+    float4 c1 = _InputTexture[id.xy * 2 + int2(0, 0)];
+    float4 c2 = id.x * 2 + 1 < _Width * 2 ? _InputTexture[id.xy * 2 + int2(1, 0)] : 0;
+    float4 c3 = id.y * 2 + 1 < _Height * 2 ? _InputTexture[id.xy * 2 + int2(0, 1)] : 0;
+    float4 c4 = (id.x * 2 + 1 < _Width * 2 && id.y * 2 + 1 < _Height * 2) ? _InputTexture[id.xy * 2 + int2(1, 1)] : 0;
     // c1 = float4(pow(abs(c1.rgb), 1.0 / 2.2), 1.0);
     // c2 = float4(pow(abs(c2.rgb), 1.0 / 2.2), 1.0);
     // c3 = float4(pow(abs(c3.rgb), 1.0 / 2.2), 1.0);
     // c4 = float4(pow(abs(c4.rgb), 1.0 / 2.2), 1.0);
-    // if (c2 == 0)
-    // {
-    //     _OutputTexture[uv] = float4(1.0, 1.0, 0.0, 1.0);
-    // }
 
     if (_Strategy == 0)
     {
-        _OutputTexture[uv] = min(min(c1, c2), min(c3, c4));
+        _OutputTexture[id.xy] = min(min(c1, c2), min(c3, c4));
     }
     else if (_Strategy == 1)
     {
-        _OutputTexture[uv] = max(max(c1, c2), max(c3, c4));
+        _OutputTexture[id.xy] = max(max(c1, c2), max(c3, c4));
     }
     else 
     {
-        float4 result = (c1 + c2 + c3 + c4) * 0.25f;
-        _OutputTexture[uv] = float4(result.x, result.y, result.z, 1.0);
+        // if (id.x < _Width / 2 && id.y < _Height / 2)
+        //     _OutputTexture[id.xy] = float4(0.0, 1.0, 0.0, 1.0);
+        // if (id.x > _Width / 2 && id.y < _Height / 2)
+        //     _OutputTexture[id.xy] = float4(0.0, 1.0, 1.0, 1.0);
+        // if (id.x < _Width / 2 && id.y > _Height / 2)
+        //     _OutputTexture[id.xy] = float4(1.0, 1.0, 0.0, 1.0);
+        // if (id.x > _Width / 2 && id.y > _Height / 2)
+        //     _OutputTexture[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
+        
+        float4 result = (c1 + c2 + c3 + c4) / 4.0f;
+        _OutputTexture[id.xy] = float4(result.x, result.y, result.z, 1.0);
     }
-    _OutputTexture[uv] = float4(c1.rgb, 1.0);
 }
