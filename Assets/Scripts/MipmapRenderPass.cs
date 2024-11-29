@@ -152,8 +152,8 @@ public class MipmapRenderPass : ScriptableRenderPass
         
         if (_mSettings.saveToCPU)
         {
-            SaveMipmapsToCPU(levels);
-            // SaveOrigionMipmaps();
+            // SaveMipmapsToCPU(levels);
+            SaveOrigionMipmaps();
         }
     }
     

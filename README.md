@@ -68,6 +68,14 @@ python的代码见文末。
 2. Compute Shader 的算法问题。不理解为何将整个画面一份为四，是错误的颜色，理论上不应该超出判断条件。
 3. 普通采样颜色颜色显示比原来黑。需要在ComputeShader中添加 gamma 矫正才能进行转换。
 
+### 测试流程
+
+- [x] 原图相同。
+- [x] python处理avg模式下的Mipmap，Unity原生自带处理Mipmap。
+
+1. Unity原生自带处理Mipmap和python处理的Mipmap级别有65.22%像素不一样。
+2. 
+
 ### 参阅过的解决方案
 
 1. [MiniCompute](https://github.com/cinight/MinimalCompute)
