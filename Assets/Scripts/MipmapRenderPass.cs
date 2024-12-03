@@ -61,7 +61,7 @@ public class MipmapRenderPass : ScriptableRenderPass
         _mMipmapComputeShader.SetInt(Strategy, (int)_mSettings.strategy);
         
         int levels = _mSettings.mipmapLevels > 0 ? _mSettings.mipmapLevels : Mathf.FloorToInt(Mathf.Log(Mathf.Max(_mSettings.inputTexture.width, _mSettings.inputTexture.height), 2)) + 1;
-        _mMipmapTextures = new RenderTexture[levels];
+        _mMipmapTextures    = new RenderTexture[levels];
         Stopwatch stopwatch = new Stopwatch();
         string filePath = $"{Application.dataPath}/{_mSettings.outputDirectory}/MipmapGenerationTimesAndPixels.txt";
         string directoryPath = Path.GetDirectoryName(filePath);
@@ -73,47 +73,6 @@ public class MipmapRenderPass : ScriptableRenderPass
         {
             File.Create(filePath).Dispose(); // 创建文件并立即关闭文件流
         }
-
-        Debug.Log(_mSettings.inputTexture.format);
-        Debug.Log(_mSettings.inputTexture.GetPixel(1024,1024));
-        Texture2D testTexture = new Texture2D(_mSettings.inputTexture.width, _mSettings.inputTexture.height, TextureFormat.RGBA32, false);
-        // Color topLeftColor = Color.red;     // 左上角区域是红色
-        // Color topRightColor = Color.green;  // 右上角区域是绿色
-        // Color bottomLeftColor = Color.blue; // 左下角区域是蓝色
-        // Color bottomRightColor = Color.yellow; // 右下角区域是黄色
-        //
-        // for (int y = 0; y < 300; y++)
-        // {
-        //     for (int x = 0; x < 400; x++)
-        //     {
-        //         // 判断当前像素所在的区域
-        //         Color pixelColor;
-        //         if (x < 400 / 2 && y < 300 / 2)
-        //         {
-        //             pixelColor = topLeftColor; // 左上角
-        //         }
-        //         else if (x >= 400 / 2 && y < 300 / 2)
-        //         {
-        //             pixelColor = topRightColor; // 右上角
-        //         }
-        //         else if (x < 400 / 2 && y >= 300 / 2)
-        //         {
-        //             pixelColor = bottomLeftColor; // 左下角
-        //         }
-        //         else
-        //         {
-        //             pixelColor = bottomRightColor; // 右下角
-        //         }
-        //         testTexture.SetPixel(x, y, pixelColor);
-        //     }
-        // }
-        // testTexture.Apply();
-        Color[] pixels = _mSettings.inputTexture.GetPixels();
-        testTexture.SetPixels(pixels);
-        testTexture.Apply();
-        string filePath2 = $"{Application.dataPath}/OutputMipMap/test.png";
-        byte[] pngData = testTexture.EncodeToPNG();
-        File.WriteAllBytes(filePath2, pngData);
         
         using (_mWriter = new StreamWriter(filePath, true)) // 'true' 表示追加到文件
         {
@@ -124,7 +83,10 @@ public class MipmapRenderPass : ScriptableRenderPass
                 
                 _mMipmapTextures[i] = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32)
                 {
-                    enableRandomWrite = true
+                    enableRandomWrite = true,
+                    useMipMap = true,
+                    autoGenerateMips = false,
+                    filterMode = FilterMode.Point
                 };
                 _mMipmapTextures[i].Create();
                 
@@ -135,25 +97,27 @@ public class MipmapRenderPass : ScriptableRenderPass
                 }
                 else
                 {
+                    RenderTexture.active = _mMipmapTextures[i-1];
                     _mMipmapComputeShader.SetTexture(_mComputeKernel, InputTexture, _mMipmapTextures[i-1]);
                     _mMipmapComputeShader.SetInt(Width, width);
                     _mMipmapComputeShader.SetInt(Height, height);
                     _mMipmapComputeShader.SetTexture(_mComputeKernel, _outputTexture, _mMipmapTextures[i]);
                     _mMipmapComputeShader.Dispatch(_mComputeKernel, Mathf.CeilToInt(width / 8.0f), Mathf.CeilToInt(height / 8.0f), 1);
+                    RenderTexture.active = null;
                 }
-            
                 stopwatch.Stop();
                 double elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
                 _mWriter.WriteLine($"{i} {elapsedMilliseconds:F6} {width*height}");
                 stopwatch.Reset();
-                Debug.Log($"{_mSettings.inputTexture.name} level {i} generate mipmap time : {elapsedMilliseconds:F6} ms");
+                // Debug.Log($"{_mSettings.inputTexture.name} level {i} generate mipmap time : {elapsedMilliseconds:F6} ms");
             }
+            RenderTexture.active = null;
         }
         
         if (_mSettings.saveToCPU)
         {
-            // SaveMipmapsToCPU(levels);
-            SaveOrigionMipmaps();
+            SaveMipmapsToCPU(levels);
+            // SaveOrigionMipmaps();
         }
     }
     
@@ -164,14 +128,14 @@ public class MipmapRenderPass : ScriptableRenderPass
         {
             Directory.CreateDirectory(outputDirectory);
         }
-
+        
         for (int i = 0; i < levels; i++)
         {
             int width  = _mMipmapTextures[i].width;
             int height = _mMipmapTextures[i].height;
             
             RenderTexture.active = _mMipmapTextures[i];
-            Texture2D mipTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            Texture2D mipTexture = new Texture2D(width, height, TextureFormat.ARGB32, false);
             mipTexture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
             mipTexture.Apply();
             RenderTexture.active = null;
@@ -179,7 +143,7 @@ public class MipmapRenderPass : ScriptableRenderPass
             byte[] pngData = mipTexture.EncodeToPNG();
             File.WriteAllBytes(filePath, pngData);
             Object.DestroyImmediate(mipTexture);
-            Debug.Log($"Saved {_mSettings.inputTexture.name} MipLevel {i} to {filePath}");
+            // Debug.Log($"Saved {_mSettings.inputTexture.name} MipLevel {i} to {filePath}");
         }
     }
 

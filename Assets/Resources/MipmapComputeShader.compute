@@ -1,6 +1,6 @@
 #pragma kernel CSMain
 
-Texture2D<float4>   _InputTexture;
+Texture2D           _InputTexture;
 RWTexture2D<float4> _OutputTexture;
 
 int _Width;
@@ -10,17 +10,17 @@ int _Strategy; // 0: Min, 1: Max, 2: Avg
 [numthreads(8, 8, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
-    if (id.x >= _Width || id.y >= _Height)
+    if (int(id.x) >= _Width || int(id.y) >= _Height)
         return;
     
     float4 c1 = _InputTexture[id.xy * 2 + int2(0, 0)];
-    float4 c2 = id.x * 2 + 1 < _Width * 2 ? _InputTexture[id.xy * 2 + int2(1, 0)] : 0;
-    float4 c3 = id.y * 2 + 1 < _Height * 2 ? _InputTexture[id.xy * 2 + int2(0, 1)] : 0;
-    float4 c4 = (id.x * 2 + 1 < _Width * 2 && id.y * 2 + 1 < _Height * 2) ? _InputTexture[id.xy * 2 + int2(1, 1)] : 0;
-    // c1 = float4(pow(abs(c1.rgb), 1.0 / 2.2), 1.0);
-    // c2 = float4(pow(abs(c2.rgb), 1.0 / 2.2), 1.0);
-    // c3 = float4(pow(abs(c3.rgb), 1.0 / 2.2), 1.0);
-    // c4 = float4(pow(abs(c4.rgb), 1.0 / 2.2), 1.0);
+    float4 c2 = int(id.x) * 2 + 1 < _Width * 2 ? _InputTexture[id.xy * 2 + int2(1, 0)] : c1;
+    float4 c3 = int(id.y) * 2 + 1 < _Height * 2 ? _InputTexture[id.xy * 2 + int2(0, 1)] : c1;
+    float4 c4 = (int(id.x) * 2 + 1 < _Width * 2 && int(id.y) * 2 + 1 < _Height * 2) ? _InputTexture[id.xy * 2 + int2(1, 1)] : c1;
+    c1 = float4(pow(abs(c1.rgb), 1.0 / 2.2), 1.0);
+    c2 = float4(pow(abs(c2.rgb), 1.0 / 2.2), 1.0);
+    c3 = float4(pow(abs(c3.rgb), 1.0 / 2.2), 1.0);
+    c4 = float4(pow(abs(c4.rgb), 1.0 / 2.2), 1.0);
 
     if (_Strategy == 0)
     {
@@ -32,15 +32,6 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     }
     else 
     {
-        // if (id.x < _Width / 2 && id.y < _Height / 2)
-        //     _OutputTexture[id.xy] = float4(0.0, 1.0, 0.0, 1.0);
-        // if (id.x > _Width / 2 && id.y < _Height / 2)
-        //     _OutputTexture[id.xy] = float4(0.0, 1.0, 1.0, 1.0);
-        // if (id.x < _Width / 2 && id.y > _Height / 2)
-        //     _OutputTexture[id.xy] = float4(1.0, 1.0, 0.0, 1.0);
-        // if (id.x > _Width / 2 && id.y > _Height / 2)
-        //     _OutputTexture[id.xy] = float4(1.0, 0.0, 0.0, 1.0);
-        
         float4 result = (c1 + c2 + c3 + c4) / 4.0f;
         _OutputTexture[id.xy] = float4(result.x, result.y, result.z, 1.0);
     }

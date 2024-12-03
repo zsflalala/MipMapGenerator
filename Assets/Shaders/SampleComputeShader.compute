@@ -5,7 +5,31 @@ RWTexture2D<float4> Result;
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID, uint3 gid : SV_GroupID, uint pid : SV_GroupIndex, uint3 gtid : SV_GroupThreadID)
 {
-    float index = (gid.x +  gid.y) % 2;
-    Result[id.xy] = float4(index, index, index, 1);
     // Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+
+    // float index = (gid.x +  gid.y) % 2;
+    // Result[id.xy] = float4(index, index, index, 1);
+    
+    // float index = (id.x / 8 +  id.y / 8 ) % 2; 
+    // Result[id.xy] = float4(index, index, index, 1);
+    
+    // 2.3 gtid ：SV_GroupThreadID 的棋盘格
+    // 不能画出【相同】的棋盘格，因为【SV_GroupThreadID】只能记录一个组内的坐标，无法计算全局坐标。
+    // 但是能画出【相似】的图案
+    // float index = (gtid.x / 4 +  gtid.y / 4 ) % 2; 
+    // Result[id.xy] = float4(index, index, index, 1);
+    
+    // 2.4 uv晶格
+    // float u = pid % 8 / 8.0;
+    // float v = pid / 64.0;
+    // Result[id.xy] = float4(u, v, 0, 1);
+
+    // 2.5 整张uv
+    // float u = id.x / 256.0;
+    // float v = id.y / 256.0;
+    // Result[id.xy] = float4(u, v, 0, 1);
+
+    // 2.6 中心 64x64 涂白
+    int index = (id.x >= 96 && id.x < 160 && id.y >= 96 && id.y < 160) ? 1 : 0;
+    Result[id.xy] = float4(index, index, index, 1);
 }
